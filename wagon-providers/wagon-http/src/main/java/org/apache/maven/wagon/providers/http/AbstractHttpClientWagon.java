@@ -902,6 +902,13 @@ public abstract class AbstractHttpClientWagon
         return repository.getUrl();
     }
 
+    @Override
+    public String getUrl( Resource resource )
+    {
+        String repositoryUrl = getRepository().getUrl();
+        return repositoryUrl + ( repositoryUrl.endsWith( "/" ) ? "" : "/" ) + resource.getName();
+    }
+
     public HttpConfiguration getHttpConfiguration()
     {
         return httpConfiguration;
@@ -971,8 +978,8 @@ public abstract class AbstractHttpClientWagon
     {
         Resource resource = inputData.getResource();
 
-        String repositoryUrl = getRepository().getUrl();
-        String url = repositoryUrl + ( repositoryUrl.endsWith( "/" ) ? "" : "/" ) + resource.getName();
+        String url = getUrl( resource );
+
         HttpGet getMethod = new HttpGet( url );
         long timestamp = resource.getLastModified();
         if ( timestamp > 0 )

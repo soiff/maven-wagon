@@ -37,12 +37,17 @@ import org.apache.maven.wagon.resource.Resource;
 import org.codehaus.plexus.util.IOUtil;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.FileInputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Implementation of common facilities for Wagon providers.
@@ -54,6 +59,10 @@ public abstract class AbstractWagon
 {
     protected static final int DEFAULT_BUFFER_SIZE = 1024 * 4;
 
+    private static final Pattern PATTERN = Pattern.compile ( "\\[\\s*([0-9]{2,3}%)\\]" );
+
+    static final List<String> DOWNLOADER = new ArrayList<String>();
+
     protected Repository repository;
 
     protected SessionEventSupport sessionEventSupport = new SessionEventSupport();
@@ -64,6 +73,18 @@ public abstract class AbstractWagon
 
     protected boolean interactive = true;
 
+    static {
+        final String keyDownloaderPath = "maven.wagon.loader";
+        final String loader = ( null == System.getProperty ( keyDownloaderPath )
+            ? System.getenv ().get ( keyDownloaderPath ) : System.getProperty ( keyDownloaderPath ) );
+        if ( null != loader && loader.length() > 0 )
+        {
+            for ( String e : loader.split( "[,;\\s]" ) )
+            {
+                DOWNLOADER.add( e );
+            }
+        }
+    }
 
     private int connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
 
@@ -296,6 +317,46 @@ public abstract class AbstractWagon
         throws TransferFailedException
     {
         getTransfer( resource, destination, input, closeInput, (long) maxSize );
+    }
+
+    protected void getTransfer( Resource resource, String url, File destination )
+        throws TransferFailedException
+    {
+        // ensure that the destination is created only when we are ready to transfer
+        fireTransferDebug( "attempting to create parent directories for destination: " + destination.getName() );
+        createParentDirectories( destination );
+
+        fireGetStarted( resource, destination );
+
+        try
+        {
+            if ( DOWNLOADER.size() > 0 )
+            {
+                transfer ( resource, url, destination, TransferEvent.REQUEST_GET );
+                fireGetCompleted( resource, destination );
+                return ;
+            }
+        }
+        catch ( final IOException e )
+        {
+            if ( destination.exists() )
+            {
+                boolean deleted = destination.delete();
+
+                if ( !deleted )
+                {
+                    destination.deleteOnExit();
+                }
+            }
+
+            fireTransferError( resource, e, TransferEvent.REQUEST_GET );
+
+            String msg = "GET request of: " + resource.getName() + " from " + repository.getName() + " failed";
+
+            throw new TransferFailedException( msg, e );
+        }
+
+        fireGetCompleted( resource, destination );
     }
 
     protected void getTransfer( Resource resource, File destination, InputStream input, boolean closeInput,
@@ -582,6 +643,64 @@ public abstract class AbstractWagon
             remaining -= n;
         }
         output.flush();
+    }
+
+    /**
+     * Write from {@link InputStream} to {@link File}.
+     * {@link Integer#MAX_VALUE}
+     *
+     * @param resource    resource to transfer
+     * @param url         url to get from
+     * @param output      output file destination
+     * @param requestType one of {@link TransferEvent#REQUEST_GET} or {@link TransferEvent#REQUEST_PUT}
+     */
+    protected void transfer( Resource resource, String url, File output, int requestType )
+        throws IOException
+    {
+        byte[] buffer = new byte[0];
+
+        TransferEvent transferEvent = new TransferEvent( this, resource, TransferEvent.TRANSFER_PROGRESS, requestType );
+        transferEvent.setTimestamp( System.currentTimeMillis() );
+
+        Runtime runtime = Runtime.getRuntime();
+        final List<String> cmdLine = new ArrayList<String>( DOWNLOADER );
+        cmdLine.add( output.getAbsoluteFile().getAbsolutePath() );
+        cmdLine.add( url );
+        final File parent = output.getParentFile( );
+        if ( ! parent.exists() )
+        {
+            parent.mkdirs();
+        }
+        Process process = runtime.exec( cmdLine.toArray( new String[cmdLine.size()] ), null, parent );
+        BufferedReader br = new BufferedReader( new InputStreamReader( process.getInputStream() ) );
+
+        //[ 93%]
+        String stdout = br.readLine(), progress;
+        Matcher matcher;
+        while ( stdout != null )
+        {
+            matcher = PATTERN.matcher ( stdout );
+            if ( matcher.matches() )
+            {
+                progress = matcher.group( 1 );
+                fireTransferProgress( transferEvent, buffer,
+                    ( (Float) ( resource.getContentLength() * Float.valueOf( "0." + progress ) ) ).intValue() );
+            }
+            stdout = br.readLine();
+        }
+        br.close();
+
+        StringBuilder sb = new StringBuilder( );
+        br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
+        for ( String stderr = br.readLine(); stderr != null; stderr = br.readLine() )
+        {
+            sb.append( stderr );
+        }
+
+        if ( sb.length() > 0 )
+        {
+            fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.TRANSFER_ERROR );
+        }
     }
 
     // ----------------------------------------------------------------------

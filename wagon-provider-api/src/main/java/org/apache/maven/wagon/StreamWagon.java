@@ -74,6 +74,11 @@ public abstract class StreamWagon
         }
     }
 
+    public String getUrl( Resource resource )
+    {
+        return null;
+    }
+
     public boolean getIfNewer( String resourceName, File destination, long timestamp )
         throws TransferFailedException, ResourceDoesNotExistException, AuthorizationException
     {
@@ -81,11 +86,15 @@ public abstract class StreamWagon
 
         Resource resource = new Resource( resourceName );
 
+        InputData id = new InputData();
+
+        id.setResource( resource );
+
         fireGetInitiated( resource, destination );
 
         resource.setLastModified( timestamp );
-        
-        InputStream is = getInputStream( resource );
+
+        InputStream is = getInputStream( id );
 
         // always get if timestamp is 0 (ie, target doesn't exist), otherwise only if older than the remote file
         if ( timestamp == 0 || timestamp < resource.getLastModified() )
@@ -94,7 +103,14 @@ public abstract class StreamWagon
 
             checkInputStream( is, resource );
 
-            getTransfer( resource, destination, is );
+            if ( DOWNLOADER.size() > 0 && getUrl( resource ) != null )
+            {
+                getTransfer( resource, getUrl( resource ), destination );
+            }
+            else
+            {
+                getTransfer( resource, destination, is );
+            }
         }
         else
         {
@@ -120,6 +136,15 @@ public abstract class StreamWagon
         InputData inputData = new InputData();
 
         inputData.setResource( resource );
+
+        return getInputStream( inputData );
+    }
+
+
+    protected InputStream getInputStream( InputData inputData )
+        throws TransferFailedException, ResourceDoesNotExistException, AuthorizationException
+    {
+        Resource resource = inputData.getResource();
 
         try
         {
@@ -252,7 +277,7 @@ public abstract class StreamWagon
                 throw new TransferFailedException( "Failure transferring " + resourceName, e );
             }
         }
-        
+
         return retValue;
     }
 

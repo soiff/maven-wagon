@@ -153,4 +153,9 @@ public class LazyFileOutputStream
     {
         delegee = new FileOutputStream( file );
     }
+
+    public File getFile()
+    {
+        return file;
+    }
 }
