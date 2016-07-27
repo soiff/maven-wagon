@@ -702,7 +702,7 @@ public abstract class AbstractWagon
 
             if ( sb.length() > 0 )
             {
-                fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.TRANSFER_ERROR );
+                fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
             }
         }
     }
