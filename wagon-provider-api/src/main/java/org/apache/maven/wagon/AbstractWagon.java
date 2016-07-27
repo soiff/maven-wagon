@@ -675,7 +675,7 @@ public abstract class AbstractWagon
         //[ 93%]
         String stdout = br.readLine(), stringProgress;
         Matcher matcher;
-        float progress = 0;
+        float progress = 0, previous = 0 ;
         while ( stdout != null )
         {
             matcher = PATTERN.matcher ( stdout );
@@ -684,7 +684,8 @@ public abstract class AbstractWagon
                 stringProgress = matcher.group( 1 );
                 progress = Float.valueOf( "0." + stringProgress );
                 fireTransferProgress( transferEvent, buffer,
-                    ( (Float) ( resource.getContentLength() * progress ) ).intValue() );
+                    ( (Float) ( resource.getContentLength() * ( progress - previous ) ) ).intValue() );
+                previous = progress;
             }
             stdout = br.readLine();
         }
