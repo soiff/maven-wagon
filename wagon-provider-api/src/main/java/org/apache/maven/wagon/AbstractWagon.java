@@ -333,8 +333,6 @@ public abstract class AbstractWagon
             if ( DOWNLOADER.size() > 0 )
             {
                 transfer ( resource, url, destination, TransferEvent.REQUEST_GET );
-                fireGetCompleted( resource, destination );
-                return ;
             }
         }
         catch ( final IOException e )
@@ -675,31 +673,36 @@ public abstract class AbstractWagon
         BufferedReader br = new BufferedReader( new InputStreamReader( process.getInputStream() ) );
 
         //[ 93%]
-        String stdout = br.readLine(), progress;
+        String stdout = br.readLine(), stringProgress;
         Matcher matcher;
+        float progress = 0;
         while ( stdout != null )
         {
             matcher = PATTERN.matcher ( stdout );
             if ( matcher.matches() )
             {
-                progress = matcher.group( 1 );
+                stringProgress = matcher.group( 1 );
+                progress = Float.valueOf( "0." + stringProgress );
                 fireTransferProgress( transferEvent, buffer,
-                    ( (Float) ( resource.getContentLength() * Float.valueOf( "0." + progress ) ) ).intValue() );
+                    ( (Float) ( resource.getContentLength() * progress ) ).intValue() );
             }
             stdout = br.readLine();
         }
         br.close();
 
-        StringBuilder sb = new StringBuilder( );
-        br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
-        for ( String stderr = br.readLine(); stderr != null; stderr = br.readLine() )
+        if ( progress < 100.0 )
         {
-            sb.append( stderr );
-        }
+            StringBuilder sb = new StringBuilder();
+            br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
+            for ( String stderr = br.readLine(); stderr != null; stderr = br.readLine() )
+            {
+                sb.append( stderr );
+            }
 
-        if ( sb.length() > 0 )
-        {
-            fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.TRANSFER_ERROR );
+            if ( sb.length() > 0 )
+            {
+                fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.TRANSFER_ERROR );
+            }
         }
     }
 
