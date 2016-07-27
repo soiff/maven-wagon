@@ -675,7 +675,7 @@ public abstract class AbstractWagon
         //[ 93%]
         String stdout = br.readLine(), stringProgress;
         Matcher matcher;
-        float progress = 0, previous = 0 ;
+        float progress = 0F, previous = 0F ;
         while ( stdout != null )
         {
             matcher = PATTERN.matcher ( stdout );
@@ -691,7 +691,7 @@ public abstract class AbstractWagon
         }
         br.close();
 
-        if ( progress < 100.0 )
+        if ( progress < 100.0F )
         {
             StringBuilder sb = new StringBuilder();
             br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
