@@ -665,9 +665,14 @@ public abstract class AbstractWagon
         cmdLine.add( output.getAbsoluteFile().getAbsolutePath() );
         cmdLine.add( url );
         final File parent = output.getParentFile( );
+        final File st = new File( output.getCanonicalPath() + ".st" );
         if ( ! parent.exists() )
         {
             parent.mkdirs();
+        }
+        if ( ! st.exists() )
+        {
+            st.createNewFile();
         }
         Process process = runtime.exec( cmdLine.toArray( new String[cmdLine.size()] ), null, parent );
         BufferedReader br = new BufferedReader( new InputStreamReader( process.getInputStream() ) );
@@ -691,7 +696,7 @@ public abstract class AbstractWagon
         }
         br.close();
 
-        if ( progress < 100.0F )
+        if ( progress != 100.0F )
         {
             StringBuilder sb = new StringBuilder();
             br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
@@ -704,6 +709,10 @@ public abstract class AbstractWagon
             {
                 fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
             }
+        }
+        else
+        {
+            st.delete();
         }
     }
 
