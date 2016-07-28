@@ -660,7 +660,6 @@ public abstract class AbstractWagon
         TransferEvent transferEvent = new TransferEvent( this, resource, TransferEvent.TRANSFER_PROGRESS, requestType );
         transferEvent.setTimestamp( System.currentTimeMillis() );
 
-        Runtime runtime = Runtime.getRuntime();
         final List<String> cmdLine = new ArrayList<String>( DOWNLOADER );
         cmdLine.add( output.getAbsoluteFile().getAbsolutePath() );
         cmdLine.add( url );
@@ -669,7 +668,9 @@ public abstract class AbstractWagon
         {
             parent.mkdirs();
         }
-        Process process = runtime.exec( cmdLine.toArray( new String[cmdLine.size()] ), null, parent );
+        ProcessBuilder pb = new ProcessBuilder( cmdLine.toArray( new String[cmdLine.size()] ) )
+            .directory( parent );
+        Process process = pb.start();
         BufferedReader br = new BufferedReader( new InputStreamReader( process.getInputStream() ) );
 
         //[ 93%]
