@@ -89,9 +89,9 @@ public abstract class StreamWagon
         fireGetInitiated( resource, destination );
         resource.setLastModified( timestamp );
         InputStream is = getInputStream( id );
-        final String absolutePath = destination.getAbsolutePath();
-        final File st = new File(
-            absolutePath.substring( 0, absolutePath.length() - PART_EXTENSION.length() ) + AXEL_EXTENSION );
+
+        final String url = getUrl( resource );
+        final File st = getAxelStateFile( destination, url );
 
         // always get if timestamp is 0 (ie, target doesn't exist), otherwise only if older than the remote file
         if ( timestamp == 0 || st.exists() || timestamp < resource.getLastModified() )
@@ -100,9 +100,9 @@ public abstract class StreamWagon
 
             checkInputStream( is, resource );
 
-            if ( AXEL.size() > 0 && getUrl( resource ) != null )
+            if ( AXEL.size() > 0 && url != null )
             {
-                getTransfer( resource, getUrl( resource ), destination );
+                getTransfer( resource, url, destination );
             }
             else
             {

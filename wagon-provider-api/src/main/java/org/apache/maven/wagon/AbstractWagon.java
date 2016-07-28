@@ -61,7 +61,7 @@ public abstract class AbstractWagon
 
     private static final Pattern AXEL_OUTPUT_PATTERN = Pattern.compile ( "^\\[ *(([0-9]{1,3}))%\\] .*" );
     static final List<String> AXEL = new ArrayList<String>();
-    static final String AXEL_EXTENSION = ".st";
+    static final String AXEL_STATE_EXTENSION = ".st";
     static final String PART_EXTENSION = ".part";
 
     protected Repository repository;
@@ -147,6 +147,21 @@ public abstract class AbstractWagon
     public AuthenticationInfo getAuthenticationInfo()
     {
         return authenticationInfo;
+    }
+
+    public String getAxelPath ( File output, String url )
+    {
+        return output.getParent() + File.separatorChar + url.substring( url.lastIndexOf( "/" ) + 1 );
+    }
+
+    public File getAxelStateFile ( File output, String url )
+    {
+        return new File( getAxelPath( output, url ) + File.separatorChar + AXEL_STATE_EXTENSION );
+    }
+
+    public File getAxelFile( File output, String url )
+    {
+        return new File( getAxelPath( output, url ) );
     }
 
     // ----------------------------------------------------------------------
@@ -691,8 +706,6 @@ public abstract class AbstractWagon
         }
 
         final List<String> cmdLine = new ArrayList<String>( AXEL );
-        final String absolutePath = output.getAbsolutePath();
-        final File temporary = new File( absolutePath.substring( 0, absolutePath.length() - PART_EXTENSION.length() ) );
         cmdLine.add( url );
         final File parent = output.getParentFile( );
         if ( ! parent.exists() )
@@ -746,9 +759,10 @@ public abstract class AbstractWagon
         }
         else
         {
-            if ( temporary.exists() )
+            final File axel = getAxelFile ( output, url );
+            if ( axel.exists() )
             {
-                temporary.renameTo( output );
+                axel.renameTo( output );
             }
         }
     }
