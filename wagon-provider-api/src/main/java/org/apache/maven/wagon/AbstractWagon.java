@@ -692,6 +692,16 @@ public abstract class AbstractWagon
         }
         br.close();
 
+        int exitCode = -1;
+        try
+        {
+            exitCode = process.waitFor();
+        }
+        catch ( InterruptedException e )
+        {
+            e.printStackTrace();
+        }
+
         if ( progress != 100.0F )
         {
             StringBuilder sb = new StringBuilder();
@@ -700,11 +710,8 @@ public abstract class AbstractWagon
             {
                 sb.append( stderr );
             }
-
-            if ( sb.length() > 0 )
-            {
-                fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
-            }
+            sb.append( " Exit code: " ).append( exitCode );
+            fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
         }
     }
 
