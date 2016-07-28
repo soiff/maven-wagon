@@ -41,13 +41,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.FileInputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Implementation of common facilities for Wagon providers.
@@ -59,10 +55,8 @@ public abstract class AbstractWagon
 {
     protected static final int DEFAULT_BUFFER_SIZE = 1024 * 4;
 
-    private static final Pattern AXEL_OUTPUT_PATTERN = Pattern.compile ( "^\\[ *(([0-9]{1,3}))%\\] .*" );
-    static final List<String> AXEL = new ArrayList<String>();
+    static final String EXTERNAL_LOADER;
     static final String AXEL_STATE_EXTENSION = ".st";
-    static final String PART_EXTENSION = ".part";
 
     protected Repository repository;
 
@@ -74,41 +68,10 @@ public abstract class AbstractWagon
 
     protected boolean interactive = true;
 
-    protected static List<String> findAxel()
-    {
-        if ( AXEL.size() > 0 )
-        {
-            return AXEL;
-        }
-        File axel = new File( "axel" );
-        if ( ! axel.exists() )
-        {
-            axel = new File( "axel.exe" );
-        }
-        if ( axel.exists() )
-        {
-            AXEL.add( axel.getAbsolutePath() );
-            AXEL.add( "-n" );
-            AXEL.add( String.valueOf( Runtime.getRuntime().availableProcessors() ) );
-        }
-        return AXEL;
-    }
-
     static {
-        final String keyDownloaderPath = "maven.wagon.loader";
-        final String loader = ( null == System.getProperty ( keyDownloaderPath )
+        final String keyDownloaderPath = "maven.external.loader";
+        EXTERNAL_LOADER = ( null == System.getProperty ( keyDownloaderPath )
             ? System.getenv ().get ( keyDownloaderPath ) : System.getProperty ( keyDownloaderPath ) );
-        if ( null != loader && loader.length() > 0 )
-        {
-            for ( String e : loader.split( "[,;\\s]" ) )
-            {
-                AXEL.add( e );
-            }
-        }
-        else
-        {
-            findAxel();
-        }
     }
 
     private int connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
@@ -368,12 +331,14 @@ public abstract class AbstractWagon
 
         fireGetStarted( resource, destination );
 
+        if ( null == EXTERNAL_LOADER || EXTERNAL_LOADER.length() <= 0 )
+        {
+            throw new RuntimeException( "Invalid external format" );
+        }
+
         try
         {
-            if ( AXEL.size() > 0 )
-            {
-                transfer ( resource, url, destination, TransferEvent.REQUEST_GET );
-            }
+            transfer ( resource, url, destination, TransferEvent.REQUEST_GET );
         }
         catch ( final IOException e )
         {
@@ -695,8 +660,6 @@ public abstract class AbstractWagon
     protected void transfer( Resource resource, String url, File output, int requestType )
         throws IOException
     {
-        byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
-
         TransferEvent transferEvent = new TransferEvent( this, resource, TransferEvent.TRANSFER_PROGRESS, requestType );
         transferEvent.setTimestamp( System.currentTimeMillis() );
 
@@ -705,61 +668,32 @@ public abstract class AbstractWagon
             output.delete();
         }
 
-        final List<String> cmdLine = new ArrayList<String>( AXEL );
-        cmdLine.add( url );
         final File parent = output.getParentFile( );
         if ( ! parent.exists() )
         {
             parent.mkdirs();
         }
-        ProcessBuilder pb = new ProcessBuilder( cmdLine.toArray( new String[cmdLine.size()] ) )
-            .directory( parent );
+
+        final List<String> cmdLine = new ArrayList<String>( 3 );
+        cmdLine.add( EXTERNAL_LOADER );
+        cmdLine.add( output.getAbsolutePath() );
+        cmdLine.add( url );
+        ProcessBuilder pb = new ProcessBuilder( cmdLine ).directory( parent );
         Process process = pb.start();
-        BufferedReader br = new BufferedReader( new InputStreamReader( process.getInputStream() ) );
 
-        //[ 93%]
-        String stdout = br.readLine(), stringProgress;
-        Matcher matcher;
-        float progress = 0F, previous = 0F ;
-        int bytes;
-        while ( stdout != null )
-        {
-            matcher = AXEL_OUTPUT_PATTERN.matcher ( stdout );
-            if ( matcher.matches() )
-            {
-                stringProgress = matcher.group( 1 );
-                progress = Float.valueOf( stringProgress ) / 100F;
-                bytes = Float.valueOf( resource.getContentLength() * ( progress - previous ) ).intValue();
-                if ( bytes > 0 )
-                {
-                    fireTransferProgress( transferEvent, buffer, bytes );
-                }
-                previous = progress;
-            }
-            stdout = br.readLine();
-        }
-        br.close();
-
-        int exitCode = -1;
+        int exitCode;
         try
         {
             exitCode = process.waitFor();
         }
         catch ( InterruptedException e )
         {
-            e.printStackTrace();
+            throw new RuntimeException( e.getMessage() );
         }
 
-        if ( 0 != exitCode && progress != 100.0F )
+        if ( 0 != exitCode )
         {
-            StringBuilder sb = new StringBuilder();
-            br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
-            for ( String stderr = br.readLine(); stderr != null; stderr = br.readLine() )
-            {
-                sb.append( stderr );
-            }
-            sb.append( " Exit code: " ).append( exitCode );
-            fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
+            fireTransferError( resource, new Exception( "(" + exitCode + ")" ), TransferEvent.REQUEST_GET );
         }
         else
         {

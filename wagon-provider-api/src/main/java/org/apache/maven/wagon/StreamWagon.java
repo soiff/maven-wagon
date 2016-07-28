@@ -100,7 +100,7 @@ public abstract class StreamWagon
 
             checkInputStream( is, resource );
 
-            if ( AXEL.size() > 0 && url != null )
+            if ( null != EXTERNAL_LOADER && EXTERNAL_LOADER.length() > 0 )
             {
                 getTransfer( resource, url, destination );
             }
