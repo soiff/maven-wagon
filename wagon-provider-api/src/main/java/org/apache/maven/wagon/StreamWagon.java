@@ -83,27 +83,24 @@ public abstract class StreamWagon
         throws TransferFailedException, ResourceDoesNotExistException, AuthorizationException
     {
         boolean retValue = false;
-
         Resource resource = new Resource( resourceName );
-
         InputData id = new InputData();
-
         id.setResource( resource );
-
         fireGetInitiated( resource, destination );
-
         resource.setLastModified( timestamp );
-
         InputStream is = getInputStream( id );
+        final String absolutePath = destination.getAbsolutePath();
+        final File st = new File(
+            absolutePath.substring( 0, absolutePath.length() - PART_EXTENSION.length() ) + AXEL_EXTENSION );
 
         // always get if timestamp is 0 (ie, target doesn't exist), otherwise only if older than the remote file
-        if ( timestamp == 0 || timestamp < resource.getLastModified() )
+        if ( timestamp == 0 || st.exists() || timestamp < resource.getLastModified() )
         {
             retValue = true;
 
             checkInputStream( is, resource );
 
-            if ( DOWNLOADER.size() > 0 && getUrl( resource ) != null )
+            if ( AXEL.size() > 0 && getUrl( resource ) != null )
             {
                 getTransfer( resource, getUrl( resource ), destination );
             }

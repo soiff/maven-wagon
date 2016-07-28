@@ -59,9 +59,10 @@ public abstract class AbstractWagon
 {
     protected static final int DEFAULT_BUFFER_SIZE = 1024 * 4;
 
-    private static final Pattern PATTERN = Pattern.compile ( "\\[\\s*([0-9]{2,3}%)\\]" );
-
-    static final List<String> DOWNLOADER = new ArrayList<String>();
+    private static final Pattern AXEL_OUTPUT_PATTERN = Pattern.compile ( "^\\[ *(([0-9]{1,3}))%\\] .*" );
+    static final List<String> AXEL = new ArrayList<String>();
+    static final String AXEL_EXTENSION = ".st";
+    static final String PART_EXTENSION = ".part";
 
     protected Repository repository;
 
@@ -73,6 +74,26 @@ public abstract class AbstractWagon
 
     protected boolean interactive = true;
 
+    protected static List<String> findAxel()
+    {
+        if ( AXEL.size() > 0 )
+        {
+            return AXEL;
+        }
+        File axel = new File( "axel" );
+        if ( ! axel.exists() )
+        {
+            axel = new File( "axel.exe" );
+        }
+        if ( axel.exists() )
+        {
+            AXEL.add( axel.getAbsolutePath() );
+            AXEL.add( "-n" );
+            AXEL.add( String.valueOf( Runtime.getRuntime().availableProcessors() ) );
+        }
+        return AXEL;
+    }
+
     static {
         final String keyDownloaderPath = "maven.wagon.loader";
         final String loader = ( null == System.getProperty ( keyDownloaderPath )
@@ -81,8 +102,12 @@ public abstract class AbstractWagon
         {
             for ( String e : loader.split( "[,;\\s]" ) )
             {
-                DOWNLOADER.add( e );
+                AXEL.add( e );
             }
+        }
+        else
+        {
+            findAxel();
         }
     }
 
@@ -330,7 +355,7 @@ public abstract class AbstractWagon
 
         try
         {
-            if ( DOWNLOADER.size() > 0 )
+            if ( AXEL.size() > 0 )
             {
                 transfer ( resource, url, destination, TransferEvent.REQUEST_GET );
             }
@@ -660,8 +685,14 @@ public abstract class AbstractWagon
         TransferEvent transferEvent = new TransferEvent( this, resource, TransferEvent.TRANSFER_PROGRESS, requestType );
         transferEvent.setTimestamp( System.currentTimeMillis() );
 
-        final List<String> cmdLine = new ArrayList<String>( DOWNLOADER );
-        cmdLine.add( output.getName() );
+        if ( output.exists() )
+        {
+            output.delete();
+        }
+
+        final List<String> cmdLine = new ArrayList<String>( AXEL );
+        final String absolutePath = output.getAbsolutePath();
+        final File temporary = new File( absolutePath.substring( 0, absolutePath.length() - PART_EXTENSION.length() ) );
         cmdLine.add( url );
         final File parent = output.getParentFile( );
         if ( ! parent.exists() )
@@ -679,11 +710,11 @@ public abstract class AbstractWagon
         float progress = 0F, previous = 0F ;
         while ( stdout != null )
         {
-            matcher = PATTERN.matcher ( stdout );
+            matcher = AXEL_OUTPUT_PATTERN.matcher ( stdout );
             if ( matcher.matches() )
             {
                 stringProgress = matcher.group( 1 );
-                progress = Float.valueOf( "0." + stringProgress );
+                progress = Float.valueOf( stringProgress ) / 100F;
                 fireTransferProgress( transferEvent, buffer,
                     ( (Float) ( resource.getContentLength() * ( progress - previous ) ) ).intValue() );
                 previous = progress;
@@ -702,7 +733,7 @@ public abstract class AbstractWagon
             e.printStackTrace();
         }
 
-        if ( progress != 100.0F )
+        if ( 0 != exitCode && progress != 100.0F )
         {
             StringBuilder sb = new StringBuilder();
             br = new BufferedReader( new InputStreamReader( process.getErrorStream() ) );
@@ -712,6 +743,13 @@ public abstract class AbstractWagon
             }
             sb.append( " Exit code: " ).append( exitCode );
             fireTransferError( resource, new Exception( sb.toString() ), TransferEvent.REQUEST_GET );
+        }
+        else
+        {
+            if ( temporary.exists() )
+            {
+                temporary.renameTo( output );
+            }
         }
     }
 
