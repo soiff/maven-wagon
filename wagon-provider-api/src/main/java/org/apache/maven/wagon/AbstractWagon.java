@@ -721,6 +721,7 @@ public abstract class AbstractWagon
         String stdout = br.readLine(), stringProgress;
         Matcher matcher;
         float progress = 0F, previous = 0F ;
+        int bytes;
         while ( stdout != null )
         {
             matcher = AXEL_OUTPUT_PATTERN.matcher ( stdout );
@@ -728,8 +729,11 @@ public abstract class AbstractWagon
             {
                 stringProgress = matcher.group( 1 );
                 progress = Float.valueOf( stringProgress ) / 100F;
-                fireTransferProgress( transferEvent, buffer,
-                    ( (Float) ( resource.getContentLength() * ( progress - previous ) ) ).intValue() );
+                bytes = Float.valueOf( resource.getContentLength() * ( progress - previous ) ).intValue();
+                if ( bytes > 0 )
+                {
+                    fireTransferProgress( transferEvent, buffer, bytes );
+                }
                 previous = progress;
             }
             stdout = br.readLine();
