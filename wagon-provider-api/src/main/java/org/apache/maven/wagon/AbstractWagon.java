@@ -661,7 +661,7 @@ public abstract class AbstractWagon
         transferEvent.setTimestamp( System.currentTimeMillis() );
 
         final List<String> cmdLine = new ArrayList<String>( DOWNLOADER );
-        cmdLine.add( output.getAbsoluteFile().getAbsolutePath() );
+        cmdLine.add( output.getName() );
         cmdLine.add( url );
         final File parent = output.getParentFile( );
         if ( ! parent.exists() )
