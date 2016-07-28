@@ -69,7 +69,7 @@ public abstract class AbstractWagon
     protected boolean interactive = true;
 
     static {
-        final String keyDownloaderPath = "maven.external.loader";
+        final String keyDownloaderPath = "external.loader";
         EXTERNAL_LOADER = ( null == System.getProperty ( keyDownloaderPath )
             ? System.getenv ().get ( keyDownloaderPath ) : System.getProperty ( keyDownloaderPath ) );
     }
