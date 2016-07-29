@@ -698,6 +698,18 @@ public abstract class AbstractWagon
         else
         {
             final File axel = getAxelFile ( output, url );
+            final byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+            final FileInputStream fis = new FileInputStream( axel );
+            int length = fis.read( buffer );
+            while ( length >= 0 )
+            {
+                if ( length > 0 )
+                {
+                    fireTransferProgress( transferEvent, buffer, length );
+                }
+                length = fis.read( buffer );
+            }
+            IOUtil.close( fis );
             if ( axel.exists() )
             {
                 axel.renameTo( output );
